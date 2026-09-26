@@ -62,6 +62,19 @@ function servePrecompressed(req, res, next) {
   res.setHeader("Content-Encoding", encoding);
   res.setHeader("Vary", "Accept-Encoding");
   if (/\.(?:css|js|html)$/i.test(filePath)) res.setHeader("Content-Type", ({'.css':'text/css; charset=UTF-8','.js':'application/javascript; charset=UTF-8','.html':'text/html; charset=UTF-8'}[path.extname(filePath).toLowerCase()] || "application/octet-stream"));
+  // The precompressed branch bypasses express.static's setHeaders callback below,
+  // so it must set its own Cache-Control/Expires or every css/js/html response
+  // (i.e. almost every real browser request) goes out with no caching headers at all.
+  if (/\.html$/i.test(filePath)) {
+    res.setHeader("Cache-Control", "public, max-age=600, must-revalidate");
+    res.setHeader("Expires", new Date(Date.now() + 600000).toUTCString());
+  } else if (/\.(?:css|js)$/i.test(filePath)) {
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.setHeader("Expires", new Date(Date.now() + 31536000000).toUTCString());
+  } else {
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Expires", new Date(Date.now() + 86400000).toUTCString());
+  }
   return res.sendFile(compressed);
 }
 
